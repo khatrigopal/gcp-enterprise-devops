@@ -1,1 +1,98 @@
+name: Infrastructure Deployment
 
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select Environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+
+jobs:
+  terraform:
+
+    name: Terraform Deployment
+
+    runs-on: ubuntu-latest
+
+    environment: ${{ github.event.inputs.environment }}
+
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify Authentication
+        run: |
+          gcloud auth list
+          gcloud config set project $PROJECT_ID
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format Check
+        run: terraform fmt -recursive -check
+
+      - name: Terraform Init
+        working-directory: infrastructure/environments/${{ github.event.inputs.environment }}
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: infrastructure/environments/${{ github.event.inputs.environment }}
+        run: terraform validate
+
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkov Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infrastructure
+          framework: terraform
+          quiet: true
+
+      - name: tfsec Scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infrastructure
+
+      - name: Terraform Plan
+        working-directory: infrastructure/environments/${{ github.event.inputs.environment }}
+        run: |
+          terraform plan \
+          -var-file=terraform.tfvars \
+          -out=tfplan
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: infrastructure/environments/${{ github.event.inputs.environment }}/tfplan
+
+      - name: Terraform Apply
+        if: success()
+        working-directory: infrastructure/environments/${{ github.event.inputs.environment }}
+        run: |
+          terraform apply -auto-approve tfplan
