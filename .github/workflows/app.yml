@@ -3,12 +3,12 @@ name: Application CI Pipeline
 on:
   workflow_dispatch:
 
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
 
-    paths:
-      - "applications/frontend/**"
+  #   paths:
+  #     - "applications/frontend/**"
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -34,6 +34,12 @@ jobs:
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Sonar Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -66,9 +72,9 @@ jobs:
         with:
           image-ref: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/devops-repo/frontend:${{ github.run_number }}
           format: table
-          exit-code: 0
+          exit-code: 1
           ignore-unfixed: true
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
 
       - name: Push Version Tag
         run: |
