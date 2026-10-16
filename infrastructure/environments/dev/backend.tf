@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket = "gcp-devsecops-tfstate-khatrig"
+    bucket = "gcp-devsecops-tfstate-khatri"
     prefix = "dev"
   }
 }
