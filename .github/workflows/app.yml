@@ -3,6 +3,12 @@ name: Application CI Pipeline
 on:
   workflow_dispatch:
 
+  push:
+    branches:
+      - main
+
+    paths:
+      - "applications/frontend/**"
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -44,7 +50,7 @@ jobs:
           gcloud auth list
           gcloud config set project $PROJECT_ID
 
-      - name: Configure Docker
+      - name: Configure Docker Authentication
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
@@ -66,13 +72,11 @@ jobs:
 
       - name: Push Version Tag
         run: |
-          docker push \
-            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
+          docker push us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
 
       - name: Push Latest Tag
         run: |
-          docker push \
-            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
+          docker push us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
 
       - name: Deploy To Cloud Run
         run: |
@@ -90,4 +94,10 @@ jobs:
           echo "Project    : $PROJECT_ID"
           echo "Region     : $REGION"
           echo "Service    : $SERVICE_NAME"
-          echo "Repository : $REPOSITORY
+          echo "Repository : $REPOSITORY"
+          echo "Image Tag  : ${{ github.run_number }}"
+          echo "========================================="
+
+          gcloud run services describe $SERVICE_NAME \
+            --region=$REGION \
+            --format='value(status.url)'
