@@ -18,3 +18,12 @@ module "iam" {
   project_id = var.project_id
   member     = "serviceAccount:github-actions-sa@${var.project_id}.iam.gserviceaccount.com"
 }
+
+module "cloud_run" {
+  source = "../../modules/cloud-run"
+
+  service_name = "frontend"
+  region       = var.region
+
+  image = "us-central1-docker.pkg.dev/${var.project_id}/devops-repo/frontend:latest"
+}
