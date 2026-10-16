@@ -3,6 +3,7 @@ name: Application CI Pipeline
 on:
   workflow_dispatch:
 
+
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: us-central1
@@ -22,6 +23,13 @@ jobs:
 
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
@@ -59,12 +67,12 @@ jobs:
       - name: Push Version Tag
         run: |
           docker push \
-          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
+            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
 
       - name: Push Latest Tag
         run: |
           docker push \
-          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
+            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
 
       - name: Deploy To Cloud Run
         run: |
@@ -82,10 +90,4 @@ jobs:
           echo "Project    : $PROJECT_ID"
           echo "Region     : $REGION"
           echo "Service    : $SERVICE_NAME"
-          echo "Repository : $REPOSITORY"
-          echo "Image Tag  : ${{ github.run_number }}"
-          echo "========================================="
-
-          gcloud run services describe $SERVICE_NAME \
-            --region=$REGION \
-            --format='value(status.url)'
+          echo "Repository : $REPOSITORY
