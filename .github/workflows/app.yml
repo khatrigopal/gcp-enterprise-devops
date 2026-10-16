@@ -30,6 +30,11 @@ jobs:
       - name: Setup Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Verify GCP Authentication
+        run: |
+          gcloud auth list
+          gcloud config set project $PROJECT_ID
+
       - name: Configure Docker Authentication
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
@@ -37,11 +42,11 @@ jobs:
       - name: Build Docker Image
         run: |
           docker build \
-          -t us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }} \
-          ./applications/frontend
+            -t us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }} \
+            ./applications/frontend
 
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/devops-repo/frontend:${{ github.run_number }}
           format: table
@@ -49,19 +54,25 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 
-      - name: Push Version Tag
+      - name: Push Version Image
         run: |
           docker push \
-          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
+            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
 
       - name: Create Latest Tag
         run: |
           docker tag \
-          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }} \
-          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
+            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }} \
+            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
 
       - name: Push Latest Tag
         run: |
           docker push \
-          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
+            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
 
+      - name: Image Details
+        run: |
+          echo "Image successfully pushed"
+          echo "Version Tag : ${{ github.run_number }}"
+          echo "Latest Tag  : latest"
+          echo "Repository   : us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME"
