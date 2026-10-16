@@ -8,12 +8,13 @@ env:
   REGION: us-central1
   REPOSITORY: devops-repo
   IMAGE_NAME: frontend
+  SERVICE_NAME: frontend
 
 jobs:
 
-  build-and-push:
+  build-and-deploy:
 
-    name: Build And Push Image
+    name: Build Scan Push Deploy
 
     runs-on: ubuntu-latest
 
@@ -30,12 +31,12 @@ jobs:
       - name: Setup Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Verify GCP Authentication
+      - name: Verify Authentication
         run: |
           gcloud auth list
           gcloud config set project $PROJECT_ID
 
-      - name: Configure Docker Authentication
+      - name: Configure Docker
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
@@ -43,9 +44,10 @@ jobs:
         run: |
           docker build \
             -t us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }} \
+            -t us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest \
             ./applications/frontend
 
-      - name: Trivy Vulnerability Scan
+      - name: Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/devops-repo/frontend:${{ github.run_number }}
@@ -54,25 +56,36 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 
-      - name: Push Version Image
+      - name: Push Version Tag
         run: |
           docker push \
-            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
-
-      - name: Create Latest Tag
-        run: |
-          docker tag \
-            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }} \
-            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
+          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.run_number }}
 
       - name: Push Latest Tag
         run: |
           docker push \
-            us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
+          us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
 
-      - name: Image Details
+      - name: Deploy To Cloud Run
         run: |
-          echo "Image successfully pushed"
-          echo "Version Tag : ${{ github.run_number }}"
-          echo "Latest Tag  : latest"
-          echo "Repository   : us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME"
+          gcloud run deploy $SERVICE_NAME \
+            --image us-central1-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest \
+            --region $REGION \
+            --platform managed \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Show Deployment Details
+        run: |
+          echo "========================================="
+          echo "Deployment Successful"
+          echo "Project    : $PROJECT_ID"
+          echo "Region     : $REGION"
+          echo "Service    : $SERVICE_NAME"
+          echo "Repository : $REPOSITORY"
+          echo "Image Tag  : ${{ github.run_number }}"
+          echo "========================================="
+
+          gcloud run services describe $SERVICE_NAME \
+            --region=$REGION \
+            --format='value(status.url)'
