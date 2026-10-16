@@ -4,3 +4,10 @@ module "artifact_registry" {
   repository_name = "devops-repo"
   region          = var.region
 }
+
+
+module "secret_manager" {
+  source = "../../modules/secret-manager"
+
+  secret_name = "app-secret"
+}
